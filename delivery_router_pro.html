@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_12ce48482403f27006e5d463cf1ea888 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_12ce48482403f27006e5d463cf1ea888" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_12ce48482403f27006e5d463cf1ea888 = L.map(
+                "map_12ce48482403f27006e5d463cf1ea888",
+                {
+                    center: [28.6139, 77.209],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 11,
+  "zoomControl": true,
+  "preferCanvas": true,
+}
+
+                }
+            );
+            L.control.scale().addTo(map_12ce48482403f27006e5d463cf1ea888);
+
+            
+
+        
+    
+            var tile_layer_c678d49c07af8575e0f634f00804e101 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_c678d49c07af8575e0f634f00804e101.addTo(map_12ce48482403f27006e5d463cf1ea888);
+        
+    
+
+        // Global variables
+        var pickupMarker = null;
+        var deliveryMarker = null;
+        var routeLine = null;
+        var animationMarker = null;
+        var routeCoordinates = [];
+        var animationInterval = null;
+        var currentAnimationIndex = 0;
+        var clickMode = 'pickup'; // 'pickup', 'delivery', or 'none'
+        var userLocation = null;
+
+        // Initialize UI after map is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing UI...');
+            initializeUI();
+            getUserLocation();
+            setupMapClickHandler();
+        });
+
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                console.log('Requesting user location...');
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        userLocation = [position.coords.latitude, position.coords.longitude];
+                        map_12ce48482403f27006e5d463cf1ea888.setView(userLocation, 13);
+                        console.log('User location found:', userLocation);
+                        showStatus('📍 Using your current location', 'success');
+
+                        // Add a marker for user's location
+                        L.marker(userLocation, {
+                            icon: L.divIcon({
+                                html: '<div style="background:#9b59b6;color:white;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3)">👤</div>',
+                                iconSize: [30, 30],
+                                className: 'user-location-marker'
+                            })
+                        }).bindPopup('Your current location').addTo(map_12ce48482403f27006e5d463cf1ea888);
+                    },
+                    function(error) {
+                        console.log('Geolocation error:', error.message);
+                        showStatus('Using default location (Delhi)', 'info');
+                        // Map will stay at default Delhi location
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                console.log('Geolocation not supported');
+                showStatus('Geolocation not supported. Using Delhi.', 'info');
+            }
+        }
+
+        function setupMapClickHandler() {
+            map_12ce48482403f27006e5d463cf1ea888.on('click', function(e) {
+                if (clickMode === 'pickup') {
+                    setPickupLocation(e.latlng.lat, e.latlng.lng, 
+                        'Pickup: ' + e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4));
+                    clickMode = 'delivery';
+                    showStatus('📦 Now click to set DELIVERY location', 'info');
+                    updateClickModeUI();
+                } else if (clickMode === 'delivery') {
+                    setDeliveryLocation(e.latlng.lat, e.latlng.lng, 
+                        'Delivery: ' + e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4));
+                    clickMode = 'none';
+                    showStatus('✅ Both locations set! Calculate route now.', 'success');
+                    updateClickModeUI();
+
+                    // Enable route button
+                    if (pickupMarker && deliveryMarker) {
+                        document.getElementById('route-btn').disabled = false;
+                    }
+                }
+            });
+        }
+
+        function updateClickModeUI() {
+            var modeIndicator = document.getElementById('click-mode-indicator');
+            var toggleBtn = document.getElementById('toggle-click-mode-btn');
+
+            if (clickMode === 'pickup') {
+                modeIndicator.innerHTML = '🖱️ Click mode: <strong style="color:#27ae60">PICKUP</strong>';
+                modeIndicator.style.display = 'block';
+                toggleBtn.textContent = '⏸️ Disable Click Mode';
+                toggleBtn.className = 'btn btn-danger';
+            } else if (clickMode === 'delivery') {
+                modeIndicator.innerHTML = '🖱️ Click mode: <strong style="color:#e74c3c">DELIVERY</strong>';
+                modeIndicator.style.display = 'block';
+                toggleBtn.textContent = '⏸️ Disable Click Mode';
+                toggleBtn.className = 'btn btn-danger';
+            } else {
+                modeIndicator.style.display = 'none';
+                toggleBtn.textContent = '🖱️ Enable Click Mode';
+                toggleBtn.className = 'btn btn-primary';
+            }
+        }
+
+        function toggleClickMode() {
+            if (clickMode === 'none') {
+                clickMode = 'pickup';
+                showStatus('📍 Click on map to set PICKUP location', 'info');
+            } else {
+                clickMode = 'none';
+                showStatus('Click mode disabled', 'info');
+            }
+            updateClickModeUI();
+        }
+
+        function initializeUI() {
+            console.log('Initializing UI...');
+
+            // Add custom CSS
+            var style = document.createElement('style');
+            style.textContent = `
+                .control-panel {
+                    position: fixed;
+                    top: 10px;
+                    right: 10px;
+                    background: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    z-index: 1000;
+                    width: 340px;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+                .control-panel h2 {
+                    margin: 0 0 15px 0;
+                    color: #2c3e50;
+                    font-size: 20px;
+                    border-bottom: 2px solid #3498db;
+                    padding-bottom: 10px;
+                }
+                .control-group {
+                    margin-bottom: 15px;
+                }
+                .control-group label {
+                    display: block;
+                    font-weight: 600;
+                    margin-bottom: 5px;
+                    color: #34495e;
+                    font-size: 14px;
+                }
+                .control-group input {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 5px;
+                    font-size: 14px;
+                    box-sizing: border-box;
+                }
+                .control-group input:focus {
+                    outline: none;
+                    border-color: #3498db;
+                    box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+                }
+                .btn {
+                    width: 100%;
+                    padding: 12px;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 600;
+                    transition: all 0.3s;
+                    margin-top: 10px;
+                }
+                .btn-primary {
+                    background: #3498db;
+                    color: white;
+                }
+                .btn-primary:hover {
+                    background: #2980b9;
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                }
+                .btn-success {
+                    background: #27ae60;
+                    color: white;
+                }
+                .btn-success:hover {
+                    background: #229954;
+                }
+                .btn-danger {
+                    background: #e74c3c;
+                    color: white;
+                }
+                .btn-danger:hover {
+                    background: #c0392b;
+                }
+                .btn:disabled {
+                    background: #95a5a6;
+                    cursor: not-allowed;
+                    transform: none;
+                }
+                .info-box {
+                    background: #ecf0f1;
+                    padding: 12px;
+                    border-radius: 5px;
+                    margin-top: 15px;
+                    font-size: 13px;
+                }
+                .info-box div {
+                    margin: 5px 0;
+                    color: #2c3e50;
+                }
+                .info-box strong {
+                    color: #2980b9;
+                }
+                .status-message {
+                    margin-top: 10px;
+                    padding: 10px;
+                    border-radius: 5px;
+                    font-size: 13px;
+                    text-align: center;
+                }
+                .status-success {
+                    background: #d4edda;
+                    color: #155724;
+                    border: 1px solid #c3e6cb;
+                }
+                .status-error {
+                    background: #f8d7da;
+                    color: #721c24;
+                    border: 1px solid #f5c6cb;
+                }
+                .status-info {
+                    background: #d1ecf1;
+                    color: #0c5460;
+                    border: 1px solid #bee5eb;
+                }
+                .click-mode-indicator {
+                    background: #fff3cd;
+                    color: #856404;
+                    padding: 10px;
+                    border-radius: 5px;
+                    margin-top: 10px;
+                    text-align: center;
+                    font-size: 13px;
+                    border: 2px dashed #ffc107;
+                    animation: blink 1.5s infinite;
+                }
+                @keyframes blink {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.7; }
+                }
+                .divider {
+                    text-align: center;
+                    margin: 15px 0;
+                    color: #7f8c8d;
+                    font-size: 12px;
+                    position: relative;
+                }
+                .divider::before,
+                .divider::after {
+                    content: '';
+                    position: absolute;
+                    top: 50%;
+                    width: 42%;
+                    height: 1px;
+                    background: #ddd;
+                }
+                .divider::before {
+                    left: 0;
+                }
+                .divider::after {
+                    right: 0;
+                }
+            `;
+            document.head.appendChild(style);
+
+            // Create UI panel
+            var panel = document.createElement('div');
+            panel.className = 'control-panel';
+            panel.innerHTML = `
+                <h2>🚚 Delivery Router Pro</h2>
+
+                <button class="btn btn-primary" id="toggle-click-mode-btn" onclick="toggleClickMode()">
+                    🖱️ Enable Click Mode
+                </button>
+
+                <div class="click-mode-indicator" id="click-mode-indicator" style="display:none;">
+                    🖱️ Click mode: <strong>PICKUP</strong>
+                </div>
+
+                <div class="divider">OR USE SEARCH</div>
+
+                <div class="control-group">
+                    <label>📍 Pickup Location</label>
+                    <input type="text" id="pickup-input" placeholder="Enter pickup address or place...">
+                    <button class="btn btn-primary" onclick="searchLocation('pickup')">Search Pickup</button>
+                </div>
+
+                <div class="control-group">
+                    <label>📦 Delivery Location</label>
+                    <input type="text" id="delivery-input" placeholder="Enter delivery address or place...">
+                    <button class="btn btn-primary" onclick="searchLocation('delivery')">Search Delivery</button>
+                </div>
+
+                <button class="btn btn-success" onclick="calculateRoute()" id="route-btn" disabled>
+                    📏 Calculate Route
+                </button>
+
+                <button class="btn btn-success" onclick="startAnimation()" id="animate-btn" disabled>
+                    🎬 Start Delivery Animation
+                </button>
+
+                <button class="btn btn-danger" onclick="clearAll()">
+                    🗑️ Clear All
+                </button>
+
+                <div id="status-message"></div>
+
+                <div class="info-box" id="route-info" style="display:none;">
+                    <div><strong>Distance:</strong> <span id="distance">-</span></div>
+                    <div><strong>Duration:</strong> <span id="duration">-</span></div>
+                    <div><strong>ETA:</strong> <span id="eta">-</span></div>
+                </div>
+            `;
+            document.body.appendChild(panel);
+
+            // Start with click mode enabled by default
+            clickMode = 'pickup';
+            updateClickModeUI();
+            showStatus('📍 Click on map to set PICKUP location', 'info');
+
+            console.log('UI initialized successfully');
+        }
+
+        function showStatus(message, type) {
+            var statusDiv = document.getElementById('status-message');
+            statusDiv.className = 'status-message status-' + type;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+
+            if (type !== 'error' && type !== 'info') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 4000);
+            }
+        }
+
+        async function searchLocation(locationType) {
+            var inputId = locationType + '-input';
+            var query = document.getElementById(inputId).value.trim();
+
+            if (!query) {
+                showStatus('Please enter a location', 'error');
+                return;
+            }
+
+            showStatus('Searching...', 'info');
+
+            try {
+                var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + 
+                          encodeURIComponent(query) + '&limit=1';
+
+                var response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'DeliveryRouterPro/1.0'
+                    }
+                });
+
+                var data = await response.json();
+
+                if (data.length === 0) {
+                    showStatus('Location not found. Try a different search.', 'error');
+                    return;
+                }
+
+                var lat = parseFloat(data[0].lat);
+                var lon = parseFloat(data[0].lon);
+                var displayName = data[0].display_name;
+
+                if (locationType === 'pickup') {
+                    setPickupLocation(lat, lon, displayName);
+                } else {
+                    setDeliveryLocation(lat, lon, displayName);
+                }
+
+                showStatus('Location found!', 'success');
+
+                // Enable route button if both locations are set
+                if (pickupMarker && deliveryMarker) {
+                    document.getElementById('route-btn').disabled = false;
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                showStatus('Search failed. Please try again.', 'error');
+            }
+        }
+
+        function setPickupLocation(lat, lon, name) {
+            // Remove old marker
+            if (pickupMarker) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(pickupMarker);
+            }
+
+            // Create custom icon
+            var pickupIcon = L.divIcon({
+                html: '<div style="background:#27ae60;color:white;width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3)">📍</div>',
+                iconSize: [35, 35],
+                className: 'custom-marker'
+            });
+
+            pickupMarker = L.marker([lat, lon], {icon: pickupIcon})
+                .bindPopup('<b>Pickup Location</b><br>' + name)
+                .addTo(map_12ce48482403f27006e5d463cf1ea888);
+
+            map_12ce48482403f27006e5d463cf1ea888.setView([lat, lon], 13);
+        }
+
+        function setDeliveryLocation(lat, lon, name) {
+            // Remove old marker
+            if (deliveryMarker) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(deliveryMarker);
+            }
+
+            // Create custom icon
+            var deliveryIcon = L.divIcon({
+                html: '<div style="background:#e74c3c;color:white;width:35px;height:35px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;border:3px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3)">📦</div>',
+                iconSize: [35, 35],
+                className: 'custom-marker'
+            });
+
+            deliveryMarker = L.marker([lat, lon], {icon: deliveryIcon})
+                .bindPopup('<b>Delivery Location</b><br>' + name)
+                .addTo(map_12ce48482403f27006e5d463cf1ea888);
+
+            map_12ce48482403f27006e5d463cf1ea888.setView([lat, lon], 13);
+        }
+
+        async function calculateRoute() {
+            if (!pickupMarker || !deliveryMarker) {
+                showStatus('Please set both pickup and delivery locations', 'error');
+                return;
+            }
+
+            showStatus('Calculating route...', 'info');
+
+            var pickupLatLng = pickupMarker.getLatLng();
+            var deliveryLatLng = deliveryMarker.getLatLng();
+
+            try {
+                var url = 'https://router.project-osrm.org/route/v1/driving/' +
+                          pickupLatLng.lng + ',' + pickupLatLng.lat + ';' +
+                          deliveryLatLng.lng + ',' + deliveryLatLng.lat +
+                          '?overview=full&geometries=geojson';
+
+                var response = await fetch(url);
+                var data = await response.json();
+
+                if (data.code !== 'Ok') {
+                    showStatus('Route calculation failed', 'error');
+                    return;
+                }
+
+                // Remove old route
+                if (routeLine) {
+                    map_12ce48482403f27006e5d463cf1ea888.removeLayer(routeLine);
+                }
+
+                // Get route coordinates
+                var geometry = data.routes[0].geometry.coordinates;
+                routeCoordinates = geometry.map(coord => [coord[1], coord[0]]);
+
+                // Draw route
+                routeLine = L.polyline(routeCoordinates, {
+                    color: '#3498db',
+                    weight: 5,
+                    opacity: 0.7,
+                    lineJoin: 'round'
+                }).addTo(map_12ce48482403f27006e5d463cf1ea888);
+
+                // Fit bounds
+                map_12ce48482403f27006e5d463cf1ea888.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
+
+                // Update info
+                var distance = (data.routes[0].distance / 1000).toFixed(2);
+                var duration = Math.round(data.routes[0].duration / 60);
+                var eta = new Date(Date.now() + data.routes[0].duration * 1000);
+
+                document.getElementById('distance').textContent = distance + ' km';
+                document.getElementById('duration').textContent = duration + ' mins';
+                document.getElementById('eta').textContent = eta.toLocaleTimeString();
+                document.getElementById('route-info').style.display = 'block';
+
+                document.getElementById('animate-btn').disabled = false;
+
+                showStatus('Route calculated successfully!', 'success');
+
+            } catch (error) {
+                console.error('Routing error:', error);
+                showStatus('Failed to calculate route', 'error');
+            }
+        }
+
+        function startAnimation() {
+            if (routeCoordinates.length === 0) {
+                showStatus('Please calculate a route first', 'error');
+                return;
+            }
+
+            // Stop any existing animation
+            if (animationInterval) {
+                clearInterval(animationInterval);
+            }
+
+            // Remove old animation marker
+            if (animationMarker) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(animationMarker);
+            }
+
+            currentAnimationIndex = 0;
+
+            // Create delivery vehicle icon
+            var vehicleIcon = L.divIcon({
+                html: '<div style="background:#f39c12;color:white;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;border:3px solid white;box-shadow:0 3px 8px rgba(0,0,0,0.4)">🚚</div>',
+                iconSize: [40, 40],
+                className: 'vehicle-marker'
+            });
+
+            animationMarker = L.marker(routeCoordinates[0], {icon: vehicleIcon})
+                .bindPopup('🚚 Delivery in progress...')
+                .addTo(map_12ce48482403f27006e5d463cf1ea888);
+
+            animationMarker.openPopup();
+
+            showStatus('Delivery animation started!', 'success');
+
+            // Animate along route
+            var speed = 50; // milliseconds per step
+            animationInterval = setInterval(() => {
+                currentAnimationIndex++;
+
+                if (currentAnimationIndex >= routeCoordinates.length) {
+                    clearInterval(animationInterval);
+                    animationMarker.setPopupContent('✅ Delivery completed!');
+                    animationMarker.openPopup();
+                    showStatus('Delivery completed!', 'success');
+                    return;
+                }
+
+                var nextPos = routeCoordinates[currentAnimationIndex];
+                animationMarker.setLatLng(nextPos);
+
+                // Update popup with progress
+                var progress = Math.round((currentAnimationIndex / routeCoordinates.length) * 100);
+                animationMarker.setPopupContent('🚚 Delivery progress: ' + progress + '%');
+
+            }, speed);
+        }
+
+        function clearAll() {
+            // Clear markers
+            if (pickupMarker) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(pickupMarker);
+                pickupMarker = null;
+            }
+            if (deliveryMarker) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(deliveryMarker);
+                deliveryMarker = null;
+            }
+            if (routeLine) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(routeLine);
+                routeLine = null;
+            }
+            if (animationMarker) {
+                map_12ce48482403f27006e5d463cf1ea888.removeLayer(animationMarker);
+                animationMarker = null;
+            }
+
+            // Stop animation
+            if (animationInterval) {
+                clearInterval(animationInterval);
+                animationInterval = null;
+            }
+
+            // Clear inputs
+            document.getElementById('pickup-input').value = '';
+            document.getElementById('delivery-input').value = '';
+
+            // Hide info
+            document.getElementById('route-info').style.display = 'none';
+
+            // Disable buttons
+            document.getElementById('route-btn').disabled = true;
+            document.getElementById('animate-btn').disabled = false;
+
+            // Reset coordinates
+            routeCoordinates = [];
+            currentAnimationIndex = 0;
+
+            // Reset click mode
+            clickMode = 'pickup';
+            updateClickModeUI();
+            showStatus('📍 Click on map to set PICKUP location', 'info');
+
+            // Reset map view to user location or Delhi
+            if (userLocation) {
+                map_12ce48482403f27006e5d463cf1ea888.setView(userLocation, 13);
+            } else {
+                map_12ce48482403f27006e5d463cf1ea888.setView([28.6139, 77.2090], 11);
+            }
+        }
+
+        
+</script>
+</html>
